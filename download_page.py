@@ -1,3 +1,4 @@
+import re
 import os
 import json
 import time
@@ -11,8 +12,10 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # Set Chrome options to automatically download files to the default location and handle print-to-PDF
 chrome_options = webdriver.ChromeOptions()
-NUM_PAGES = 236
+NUM_PAGES = 234
 DOWNLOAD_FOLDER = Path(r"C:\Users\Someone\Downloads")
+URL = "https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer.aspx?nBookID=109097074"
+BOOK_ID = re.search(r"nBookID=(\d+)", URL).group(1)
 # Preferences for downloading files and print settings
 prefs = {
     "download.prompt_for_download": False,  # Disable the "Save As" prompt
@@ -56,14 +59,13 @@ def save_10_pages_file(driver, url:str):
         print(f"An error occurred: {e}")
 
 
-def rename(final_pdfs):
-    for i in range(0, NUM_PAGES, 10):
-        old_name = rf"kotar-cet-ac-il.ezlibrary.technion.ac.il_KotarApp_Viewer_Popups_PrintPages.aspx_nBookID=109097074&nPageStart={i + 1}&nPageEnd={i + 10}.pdf"
-        new_name = rf"{i // 10}.pdf"
+def rename(file_names, final_pdfs):
+    for i, old_name in enumerate(file_names):
+        new_name = rf"{i}.pdf"
         new_path = DOWNLOAD_FOLDER.joinpath(new_name)
         old_path = DOWNLOAD_FOLDER.joinpath(old_name)
-        print("old_path is", old_path)
-        print("new_path is", new_path)
+        # print("old_path is", old_path)
+        # print("new_path is", new_path)
         if os.path.exists(old_path):
             os.rename(old_path, new_path)
             final_pdfs.append(new_path)
@@ -86,8 +88,16 @@ def merge_pdfs(pdf_file_names):
     print(f"Merged PDF saved as: {final_path}")
 
 
+def save_10_pages(driver, start_page: int, end_page: int, file_names: list):
+    url = f"https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer/Popups/PrintPages.aspx?nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}"
+    file_names.append(
+        f"kotar-cet-ac-il.ezlibrary.technion.ac.il_KotarApp_Viewer_Popups_PrintPages.aspx_nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}.pdf")
+    save_10_pages_file(driver=driver, url=url)
+
+
 def get_pages():
     final_pdfs = []
+    file_names = []
     driver = webdriver.Chrome(options=chrome_options)
     # Load cookies before opening the URL
     driver.get("https://kotar-cet-ac-il.ezlibrary.technion.ac.il")
@@ -103,12 +113,16 @@ def get_pages():
     driver.refresh()
 
     try:
-        for i in range(0, NUM_PAGES, 10):
-            url = f"https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer/Popups/PrintPages.aspx?nBookID=109097074&nPageStart={i + 1}&nPageEnd={i + 10}"
-            save_10_pages_file(driver=driver, url=url)
+        for i in range(0, NUM_PAGES - (NUM_PAGES % 10), 10):
+            save_10_pages(driver=driver, start_page=i + 1, end_page=i + 10, file_names=file_names)
+
+        # Handle the last batch of pages
+        if NUM_PAGES % 10 != 0:
+            i = NUM_PAGES - (NUM_PAGES % 10)
+            save_10_pages(driver=driver, start_page=i + 1, end_page=i + (NUM_PAGES % 10), file_names=file_names)
     finally:
         driver.quit()
-        rename(final_pdfs=final_pdfs)
+        rename(file_names=file_names, final_pdfs=final_pdfs)
         merge_pdfs(final_pdfs)
 
 
