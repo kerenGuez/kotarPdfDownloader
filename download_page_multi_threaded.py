@@ -2,7 +2,8 @@ import re
 import os
 import json
 import time
-
+import math
+from threading import Thread
 from pypdf import PdfWriter
 from pathlib import Path
 from selenium import webdriver
@@ -16,7 +17,11 @@ NUM_PAGES = 122
 DOWNLOAD_FOLDER = Path(r"C:\Users\Someone\Downloads")
 URL = "https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer.aspx?nBookID=99591819"
 BOOK_ID = re.search(r"nBookID=(\d+)", URL).group(1)
+SUCCESS_FILES_NUM = 0
+EXPECTED_FILES_NUM = math.ceil(NUM_PAGES / 10)
 OUT_FILE_NAME = "result2.pdf"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 
 # Preferences for downloading files and print settings
 prefs = {
@@ -41,91 +46,92 @@ chrome_options.add_experimental_option("prefs", prefs)
 chrome_options.add_argument('--kiosk-printing')  # Bypass print dialog
 
 
-# Set up the WebDriver with the configured options
-def save_10_pages_file(driver, url:str):
-    # Now open the URL that requires authentication
+# Function to save a single batch of 10 pages as a PDF
+def save_10_pages_file(driver, url: str):
     driver.get(url)
-
     try:
-        # Wait for the page to fully load
-        WebDriverWait(driver, 10).until(
+        # Wait for the page to fully load and become interactable
+        WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "cr-button.action-button"))
         )
-
-        # Trigger the print command to save as PDF
-        time.sleep(2)
+        time.sleep(5)  # Ensure the page has fully rendered and is stable
         driver.execute_script('window.print();')
-        # Optionally, wait for some time to ensure PDF is saved (depends on page complexity)
         WebDriverWait(driver, 10).until(EC.url_changes(url))
+
     except Exception as e:
         pass
 
 
-def rename(file_names, final_pdfs):
-    for i, old_name in enumerate(file_names):
-        new_name = rf"{i}.pdf"
-        new_path = DOWNLOAD_FOLDER.joinpath(new_name)
-        old_path = DOWNLOAD_FOLDER.joinpath(old_name)
-        if os.path.exists(old_path):
-            os.rename(old_path, new_path)
-            final_pdfs.append(new_path)
-        else:
-            print(f"File not found: {old_path}")
-
-
-def merge_pdfs(pdf_file_names):
+def merge_pdfs(file_paths):
     writer = PdfWriter()
-    for pdf in pdf_file_names:
+    for pdf in file_paths:
         writer.append(pdf)
-
     final_path = DOWNLOAD_FOLDER.joinpath(OUT_FILE_NAME)
     with open(final_path, "wb") as f_out:
         writer.write(f_out)
-
-    for pdf in pdf_file_names:
+    for pdf in file_paths:
         if os.path.exists(pdf):
             os.remove(pdf)
     print(f"Merged PDF saved as: {final_path}")
 
 
-def save_10_pages(driver, start_page: int, end_page: int, file_names: list):
-    print("Saving pages", start_page, "to", end_page)
+def save_10_pages(driver, start_page: int, end_page: int, file_paths: list):
+    # print("Saving pages", start_page, "to", end_page)
+    global SUCCESS_FILES_NUM # Declare the global variable
     url = f"https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer/Popups/PrintPages.aspx?nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}"
     file_name = f"kotar-cet-ac-il.ezlibrary.technion.ac.il_KotarApp_Viewer_Popups_PrintPages.aspx_nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}.pdf"
     file_path = DOWNLOAD_FOLDER.joinpath(file_name)
-    file_names.append(file_path)
+    file_paths.append(file_path)
     save_10_pages_file(driver=driver, url=url)
+    if os.path.exists(file_path):
+        print(f"Saved pages {start_page} to {end_page}")
+        SUCCESS_FILES_NUM += 1
 
 
-def get_pages():
-    file_names = []
+def worker(start, end, file_paths):
     driver = webdriver.Chrome(options=chrome_options)
     # Load cookies before opening the URL
     driver.get("https://kotar-cet-ac-il.ezlibrary.technion.ac.il")
     driver.execute_cdp_cmd('Network.enable', {})
-    for cookie in json.loads(Path('cookies.json').read_text()):
+    for cookie in json.loads(Path('../cookies.json').read_text()):
         if 'expiry' in cookie:
             cookie['expires'] = cookie['expiry']
             del cookie['expiry']
         driver.execute_cdp_cmd('Network.setCookie', cookie)
     driver.execute_cdp_cmd('Network.disable', {})
-
-    # Refresh to ensure cookies take effect
     driver.refresh()
 
     try:
-        for i in range(0, NUM_PAGES - (NUM_PAGES % 10), 10):
-            save_10_pages(driver=driver, start_page=i + 1, end_page=i + 10, file_names=file_names)
-
-        # Handle the last batch of pages
-        if NUM_PAGES % 10 != 0:
-            i = NUM_PAGES - (NUM_PAGES % 10)
-            save_10_pages(driver=driver, start_page=i + 1, end_page=i + (NUM_PAGES % 10), file_names=file_names)
+        for i in range(start, end, 10):
+            save_10_pages(driver=driver, start_page=i + 1, end_page=min(i + 10, end), file_paths=file_paths)
     finally:
         driver.quit()
-        file_names.sort(key=lambda path: int(re.search(r'nPageStart=(\d+)', str(path)).group(1)))
-        # rename(file_names=file_names, final_pdfs=final_pdfs)
-        merge_pdfs(file_names)
+
+
+def get_pages():
+    file_paths = []
+    threads = []
+    num_threads = 4  # Number of threads to use
+    pages_per_thread = NUM_PAGES // num_threads
+    start_page = 0
+    end_page = pages_per_thread
+
+    for i in range(num_threads):
+        thread = Thread(target=worker, args=(start_page, end_page, file_paths))
+        threads.append(thread)
+        thread.start()
+        start_page = end_page + 1
+        end_page = min(start_page + pages_per_thread, NUM_PAGES)
+
+    for thread in threads:
+        thread.join()
+
+    file_paths.sort(key=lambda path: int(re.search(r'nPageStart=(\d+)', str(path)).group(1)))
+    merge_pdfs(file_paths)
+    if SUCCESS_FILES_NUM == EXPECTED_FILES_NUM:
+        print("All files were successfully downloaded and merged.")
+    else:
+        print(f"Expected {EXPECTED_FILES_NUM} files, but only {SUCCESS_FILES_NUM} files were downloaded.")
 
 
 if __name__ == "__main__":
