@@ -2,8 +2,16 @@ import fitz  # PyMuPDF
 from pathlib import Path
 
 
-def crop_pdf(input_pdf_path, output_pdf_path, crop_margin):
+def crop_pdf(input_pdf_path, output_pdf_path, crop_margin=None):
     # Open the input PDF
+    if not crop_margin:
+        crop_margin = {
+            "left": 50,  # Crop 50 points from the left
+            "right": 140,  # Crop 50 points from the right
+            "top": 50,  # Crop 50 points from the top
+            "bottom": 175  # Crop 50 points from the bottom
+        }
+
     pdf_document = fitz.open(input_pdf_path)
 
     # Iterate over each page
@@ -32,15 +40,7 @@ def crop_pdf(input_pdf_path, output_pdf_path, crop_margin):
 
 if __name__ == "__main__":
     # Example usage
-    input_pdf = Path(r"C:\Users\Someone\Downloads\result2.pdf")
-    output_pdf = Path(r"C:\Users\Someone\Downloads\cropped_example.pdf")
+    input_pdf = Path(r"C:\Users\Someone\Downloads\new_result_other_file.pdf")
+    output_pdf = Path(r"C:\Users\Someone\Downloads\cropped_try_example.pdf")
 
-    # Set the margins to be cropped (in points, where 1 point = 1/72 inch)
-    crop_margins = {
-        "left": 50,    # Crop 50 points from the left
-        "right": 175,   # Crop 50 points from the right
-        "top": 50,     # Crop 50 points from the top
-        "bottom": 175   # Crop 50 points from the bottom
-    }
-
-    crop_pdf(input_pdf, output_pdf, crop_margins)
+    crop_pdf(input_pdf, output_pdf)

@@ -12,11 +12,11 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # Set Chrome options to automatically download files to the default location and handle print-to-PDF
 chrome_options = webdriver.ChromeOptions()
-NUM_PAGES = 122
+NUM_PAGES = 238
 DOWNLOAD_FOLDER = Path(r"C:\Users\Someone\Downloads")
-URL = "https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer.aspx?nBookID=99591819"
+URL = "https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer.aspx?nBookID=109097074"
 BOOK_ID = re.search(r"nBookID=(\d+)", URL).group(1)
-OUT_FILE_NAME = "result2.pdf"
+OUT_FILE_PATH = DOWNLOAD_FOLDER.joinpath("new_result.pdf")
 
 # Preferences for downloading files and print settings
 prefs = {
@@ -38,11 +38,12 @@ print_settings = {
 prefs["printing.print_preview_sticky_settings.appState"] = json.dumps(print_settings)
 
 chrome_options.add_experimental_option("prefs", prefs)
+chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
 chrome_options.add_argument('--kiosk-printing')  # Bypass print dialog
 
 
 # Set up the WebDriver with the configured options
-def save_10_pages_file(driver, url:str):
+def save_10_pages_file(driver, url: str):
     # Now open the URL that requires authentication
     driver.get(url)
 
@@ -61,31 +62,18 @@ def save_10_pages_file(driver, url:str):
         pass
 
 
-def rename(file_names, final_pdfs):
-    for i, old_name in enumerate(file_names):
-        new_name = rf"{i}.pdf"
-        new_path = DOWNLOAD_FOLDER.joinpath(new_name)
-        old_path = DOWNLOAD_FOLDER.joinpath(old_name)
-        if os.path.exists(old_path):
-            os.rename(old_path, new_path)
-            final_pdfs.append(new_path)
-        else:
-            print(f"File not found: {old_path}")
-
-
 def merge_pdfs(pdf_file_names):
     writer = PdfWriter()
     for pdf in pdf_file_names:
         writer.append(pdf)
 
-    final_path = DOWNLOAD_FOLDER.joinpath(OUT_FILE_NAME)
-    with open(final_path, "wb") as f_out:
+    with open(OUT_FILE_PATH, "wb") as f_out:
         writer.write(f_out)
 
     for pdf in pdf_file_names:
         if os.path.exists(pdf):
             os.remove(pdf)
-    print(f"Merged PDF saved as: {final_path}")
+    print(f"Merged PDFs successfully")
 
 
 def save_10_pages(driver, start_page: int, end_page: int, file_names: list):
@@ -124,7 +112,6 @@ def get_pages():
     finally:
         driver.quit()
         file_names.sort(key=lambda path: int(re.search(r'nPageStart=(\d+)', str(path)).group(1)))
-        # rename(file_names=file_names, final_pdfs=final_pdfs)
         merge_pdfs(file_names)
 
 
