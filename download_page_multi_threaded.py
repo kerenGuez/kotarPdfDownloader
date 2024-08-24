@@ -13,9 +13,9 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # Set Chrome options to automatically download files to the default location and handle print-to-PDF
 chrome_options = webdriver.ChromeOptions()
-NUM_PAGES = 238
+NUM_PAGES = 428
 DOWNLOAD_FOLDER = Path(r"C:\Users\Someone\Downloads")
-URL = "https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer.aspx?nBookID=109097074"
+URL = "https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer.aspx?nBookID=113333418"
 BOOK_ID = re.search(r"nBookID=(\d+)", URL).group(1)
 EXPECTED_FILES_NUM = math.ceil(NUM_PAGES / 10)
 OUT_FILE_PATH = DOWNLOAD_FOLDER.joinpath("new_result_other_file.pdf")
@@ -56,6 +56,7 @@ def save_10_pages_file(driver, url: str):
         time.sleep(5)  # Ensure the page has fully rendered and is stable
         driver.execute_script('window.print();')
         WebDriverWait(driver, 10).until(EC.url_changes(url))
+        time.sleep(3)  # Wait for the PDF to be saved
 
     except Exception as e:
         pass
