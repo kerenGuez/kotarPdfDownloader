@@ -12,7 +12,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # Set Chrome options to automatically download files to the default location and handle print-to-PDF
 chrome_options = webdriver.ChromeOptions()
-NUM_PAGES = 234
+NUM_PAGES = 238
 DOWNLOAD_FOLDER = Path(r"C:\Users\Someone\Downloads")
 URL = "https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer.aspx?nBookID=109097074"
 BOOK_ID = re.search(r"nBookID=(\d+)", URL).group(1)
@@ -56,7 +56,7 @@ def save_10_pages_file(driver, url:str):
         # Optionally, wait for some time to ensure PDF is saved (depends on page complexity)
         WebDriverWait(driver, 10).until(EC.url_changes(url))
     except Exception as e:
-        print(f"An error occurred: {e}")
+        pass
 
 
 def rename(file_names, final_pdfs):
@@ -89,6 +89,7 @@ def merge_pdfs(pdf_file_names):
 
 
 def save_10_pages(driver, start_page: int, end_page: int, file_names: list):
+    print("Saving pages", start_page, "to", end_page)
     url = f"https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer/Popups/PrintPages.aspx?nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}"
     file_names.append(
         f"kotar-cet-ac-il.ezlibrary.technion.ac.il_KotarApp_Viewer_Popups_PrintPages.aspx_nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}.pdf")
