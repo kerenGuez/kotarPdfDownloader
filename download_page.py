@@ -3,6 +3,7 @@ import os
 import json
 import time
 
+from config import config
 from pypdf import PdfWriter
 from pathlib import Path
 from selenium import webdriver
@@ -12,11 +13,11 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # Set Chrome options to automatically download files to the default location and handle print-to-PDF
 chrome_options = webdriver.ChromeOptions()
-NUM_PAGES = 238
-DOWNLOAD_FOLDER = Path(r"C:\Users\Someone\Downloads")
-URL = "https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer.aspx?nBookID=109097074"
+NUM_PAGES = config.NUM_PAGES
+DOWNLOAD_FOLDER = Path(config.DOWNLOAD_FOLDER)
+URL = config.URL
 BOOK_ID = re.search(r"nBookID=(\d+)", URL).group(1)
-OUT_FILE_PATH = DOWNLOAD_FOLDER.joinpath("new_result.pdf")
+OUT_FILE_PATH = DOWNLOAD_FOLDER.joinpath(config.OUT_FILE_NAME)
 
 # Preferences for downloading files and print settings
 prefs = {
