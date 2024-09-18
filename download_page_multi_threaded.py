@@ -4,10 +4,10 @@ import json
 import time
 import math
 
-from threading import Thread
-from pypdf import PdfWriter
 from pathlib import Path
+from threading import Thread
 from selenium import webdriver
+from merge_pdf import merge_pdfs
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -16,15 +16,15 @@ from config import config
 from download_page import get_pages as single_threaded_get_pages
 
 # Set Chrome options to automatically download files to the default location and handle print-to-PDF
-chrome_options = webdriver.ChromeOptions()
-NUM_PAGES = config.NUM_PAGES
-DOWNLOAD_FOLDER = Path(config.DOWNLOAD_FOLDER)
-URL = config.URL
-BOOK_ID = re.search(r"nBookID=(\d+)", URL).group(1)
-EXPECTED_FILES_NUM = math.ceil(NUM_PAGES / 10)
-OUT_FILE_PATH = DOWNLOAD_FOLDER.joinpath(config.OUT_FILE_NAME)
-DONE_PAGES = []
 TIMEOUT = 20
+DONE_PAGES = []
+URL = config.URL
+NUM_PAGES = config.NUM_PAGES
+chrome_options = webdriver.ChromeOptions()
+DOWNLOAD_FOLDER = Path(config.DOWNLOAD_FOLDER)
+EXPECTED_FILES_NUM = math.ceil(NUM_PAGES / 10)
+BOOK_ID = re.search(r"nBookID=(\d+)", URL).group(1)
+OUT_FILE_PATH = DOWNLOAD_FOLDER.joinpath(config.OUT_FILE_NAME)
 
 # Preferences for downloading files and print settings
 prefs = {
@@ -71,23 +71,10 @@ def save_10_pages_file(driver, url: str, file_path: Path):
         pass
 
 
-def merge_pdfs(file_paths):
-    writer = PdfWriter()
-    for pdf in file_paths:
-        writer.append(pdf)
-    final_path = DOWNLOAD_FOLDER.joinpath(OUT_FILE_PATH)
-    with open(final_path, "wb") as f_out:
-        writer.write(f_out)
-    for pdf in file_paths:
-        if os.path.exists(pdf):
-            os.remove(pdf)
-    print(f"Merged PDFs successfully into {OUT_FILE_PATH}")
-
-
 def save_10_pages(driver, start_page: int, end_page: int, file_paths: list):
     global DONE_PAGES
     url = f"https://kotar-cet-ac-il.ezlibrary.technion.ac.il/KotarApp/Viewer/Popups/PrintPages.aspx?nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}"
-    file_name = f"kotar-cet-ac-il.ezlibrary.technion.ac.il_KotarApp_Viewer_Popups_PrintPages.aspx_nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}.pdf"
+    file_name = f"kotar.cet.ac.il_KotarApp_Viewer_Popups_PrintPages.aspx_nBookID={BOOK_ID}&nPageStart={start_page}&nPageEnd={end_page}.pdf"
     file_path = DOWNLOAD_FOLDER.joinpath(file_name)
     file_paths.append(file_path)
     save_10_pages_file(driver=driver, url=url, file_path=file_path)
@@ -162,13 +149,13 @@ def get_pages():
         thread.join()
 
     file_paths.sort(key=lambda path: int(re.search(r'nPageStart=(\d+)', str(path)).group(1)))
-    merge_pdfs(file_paths)
+    merge_pdfs(file_paths, OUT_FILE_PATH)
     check_done_pages()
 
 
 def cleanUp():
     pattern = re.compile(
-        r"kotar-cet-ac-il\.ezlibrary\.technion\.ac\.il_KotarApp_Viewer_Popups_PrintPages\.aspx_nBookID=\d+&nPageStart=\d+&nPageEnd=\d+\.pdf")
+        r"kotar.cet.ac.il\.il_KotarApp_Viewer_Popups_PrintPages\.aspx_nBookID=\d+&nPageStart=\d+&nPageEnd=\d+\.pdf")
     # Iterate through the files in the download folder
     for file in DOWNLOAD_FOLDER.iterdir():
         if file.is_file() and pattern.match(file.name):
